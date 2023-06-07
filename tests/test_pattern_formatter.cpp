@@ -138,6 +138,22 @@ TEST_CASE("tag", "[pattern_formatter]")
     REQUIRE(log_to_str("ignored", "%?", spdlog::pattern_time_type::local, "\n") == "\n");
     spdlog::set_tag("test tag");
     REQUIRE(log_to_str("ignored", "%?", spdlog::pattern_time_type::local, "\n") == "test tag\n");
+    spdlog::set_tag("");
+}
+
+TEST_CASE("scoped_tag", "[pattern_formatter]")
+{
+    REQUIRE(log_to_str("ignored", "%?", spdlog::pattern_time_type::local, "\n") == "\n");
+    {
+        auto tag_scope = spdlog::with_tag("test tag");
+        REQUIRE(log_to_str("ignored", "%?", spdlog::pattern_time_type::local, "\n") == "test tag\n");
+        {
+            auto tag_scope2 = spdlog::with_tag("test tag2");
+            REQUIRE(log_to_str("ignored", "%?", spdlog::pattern_time_type::local, "\n") == "test tag2\n");
+        }
+        REQUIRE(log_to_str("ignored", "%?", spdlog::pattern_time_type::local, "\n") == "test tag\n");
+    }
+    REQUIRE(log_to_str("ignored", "%?", spdlog::pattern_time_type::local, "\n") == "\n");
 }
 
 //

@@ -12,6 +12,7 @@
 #include <spdlog/common.h>
 #include <spdlog/details/registry.h>
 #include <spdlog/logger.h>
+#include <spdlog/tag.h>
 #include <spdlog/version.h>
 #include <spdlog/details/synchronous_factory.h>
 
@@ -143,6 +144,8 @@ SPDLOG_API void apply_logger_env_levels(std::shared_ptr<logger> logger);
 SPDLOG_API const std::string &tag();
 
 SPDLOG_API void set_tag(std::string new_tag);
+
+SPDLOG_API scoped_tag with_tag(std::string new_tag);
 
 template<typename... Args>
 inline void log(source_loc source, level::level_enum lvl, format_string_t<Args...> fmt, Args &&... args)

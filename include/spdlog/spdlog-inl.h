@@ -131,4 +131,9 @@ SPDLOG_INLINE void set_tag(std::string new_tag) {
     details::get_tag_() = std::move(new_tag);
 }
 
+SPDLOG_INLINE scoped_tag with_tag(std::string new_tag)
+{
+    return scoped_tag(std::move(new_tag));
+}
+
 } // namespace spdlog
