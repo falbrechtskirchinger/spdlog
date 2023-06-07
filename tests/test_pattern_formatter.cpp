@@ -133,6 +133,13 @@ TEST_CASE("color range test6", "[pattern_formatter]")
     REQUIRE(msg.color_range_end == 2);
 }
 
+TEST_CASE("tag", "[pattern_formatter]")
+{
+    REQUIRE(log_to_str("ignored", "%?", spdlog::pattern_time_type::local, "\n") == "\n");
+    spdlog::set_tag("test tag");
+    REQUIRE(log_to_str("ignored", "%?", spdlog::pattern_time_type::local, "\n") == "test tag\n");
+}
+
 //
 // Test padding
 //

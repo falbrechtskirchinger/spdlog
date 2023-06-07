@@ -8,6 +8,7 @@
 #endif
 
 #include <spdlog/common.h>
+#include <spdlog/details/tag.h>
 #include <spdlog/pattern_formatter.h>
 
 namespace spdlog {
@@ -120,6 +121,14 @@ SPDLOG_INLINE void set_default_logger(std::shared_ptr<spdlog::logger> default_lo
 SPDLOG_INLINE void apply_logger_env_levels(std::shared_ptr<logger> logger)
 {
     details::registry::instance().apply_logger_env_levels(std::move(logger));
+}
+
+SPDLOG_INLINE const std::string &tag() {
+    return details::get_tag_();
+}
+
+SPDLOG_INLINE void set_tag(std::string new_tag) {
+    details::get_tag_() = std::move(new_tag);
 }
 
 } // namespace spdlog

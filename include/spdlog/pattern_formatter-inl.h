@@ -10,6 +10,7 @@
 #include <spdlog/details/fmt_helper.h>
 #include <spdlog/details/log_msg.h>
 #include <spdlog/details/os.h>
+#include <spdlog/details/tag.h>
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/formatter.h>
 
@@ -929,6 +930,23 @@ private:
     log_clock::time_point last_message_time_;
 };
 
+// print tag (user-provided, per-thread string)
+template<typename ScopedPadder>
+class tag_formatter final : public flag_formatter
+{
+public:
+    explicit tag_formatter(padding_info padinfo)
+        : flag_formatter(padinfo)
+    {}
+
+    void format(const details::log_msg &msg, const std::tm &, memory_buf_t &dest) override
+    {
+        auto &tag = get_tag_();
+        ScopedPadder p(tag.size(), padinfo_, dest);
+        fmt_helper::append_string_view(tag, dest);
+    }
+};
+
 // Full info formatter
 // pattern: [%Y-%m-%d %H:%M:%S.%e] [%n] [%l] [%s:%#] %v
 class full_formatter final : public flag_formatter
@@ -1306,6 +1324,10 @@ SPDLOG_INLINE void pattern_formatter::handle_flag_(char flag, details::padding_i
 
     case ('O'): // elapsed time since last log message in seconds
         formatters_.push_back(details::make_unique<details::elapsed_formatter<Padder, std::chrono::seconds>>(padding));
+        break;
+
+    case ('?'): // tag (user-provided, per-thread string)
+        formatters_.push_back(details::make_unique<details::tag_formatter<Padder>>(padding));
         break;
 
     default: // Unknown flag appears as is

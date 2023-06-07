@@ -140,6 +140,10 @@ SPDLOG_API void set_default_logger(std::shared_ptr<spdlog::logger> default_logge
 //   spdlog::apply_logger_env_levels(mylogger);
 SPDLOG_API void apply_logger_env_levels(std::shared_ptr<logger> logger);
 
+SPDLOG_API const std::string &tag();
+
+SPDLOG_API void set_tag(std::string new_tag);
+
 template<typename... Args>
 inline void log(source_loc source, level::level_enum lvl, format_string_t<Args...> fmt, Args &&... args)
 {
