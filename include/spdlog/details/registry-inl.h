@@ -27,6 +27,15 @@
 #include <string>
 #include <unordered_map>
 
+#ifdef SPDLOG_PER_THREAD_DEFAULT_LOGGER
+#   ifdef SPDLOG_NO_TLS
+#       error "SPDLOG_PER_THREAD_DEFAULT_LOGGER is mutually exclusive with SPDLOG_NO_TLS."
+#   endif
+#   ifndef SPDLOG_DISABLE_DEFAULT_LOGGER
+#       error "SPDLOG_PER_THREAD_DEFAULT_LOGGER requires SPDLOG_DISABLE_DEFAULT_LOGGER to be set to disable auto-initialization of the default logger."
+#   endif
+#endif
+
 namespace spdlog {
 namespace details {
 
@@ -43,6 +52,7 @@ SPDLOG_INLINE registry::registry()
 #    endif
 
     const char *default_logger_name = "";
+    auto &default_logger_ = get_default_logger_();
     default_logger_ = std::make_shared<spdlog::logger>(default_logger_name, std::move(color_sink));
     loggers_[default_logger_name] = default_logger_;
 
@@ -94,8 +104,10 @@ SPDLOG_INLINE std::shared_ptr<logger> registry::get(const std::string &logger_na
 
 SPDLOG_INLINE std::shared_ptr<logger> registry::default_logger()
 {
+#ifndef SPDLOG_PER_THREAD_DEFAULT_LOGGER
     std::lock_guard<std::mutex> lock(logger_map_mutex_);
-    return default_logger_;
+#endif
+    return get_default_logger_();
 }
 
 // Return raw ptr to the default logger.
@@ -104,7 +116,7 @@ SPDLOG_INLINE std::shared_ptr<logger> registry::default_logger()
 // e.g do not call set_default_logger() from one thread while calling spdlog::info() from another.
 SPDLOG_INLINE logger *registry::get_default_raw()
 {
-    return default_logger_.get();
+    return get_default_logger_().get();
 }
 
 // set default logger.
@@ -112,6 +124,7 @@ SPDLOG_INLINE logger *registry::get_default_raw()
 SPDLOG_INLINE void registry::set_default_logger(std::shared_ptr<logger> new_default_logger)
 {
     std::lock_guard<std::mutex> lock(logger_map_mutex_);
+    auto &default_logger_ = get_default_logger_();
     // remove previous default logger from the map
     if (default_logger_ != nullptr)
     {
@@ -219,6 +232,7 @@ SPDLOG_INLINE void registry::flush_all()
 SPDLOG_INLINE void registry::drop(const std::string &logger_name)
 {
     std::lock_guard<std::mutex> lock(logger_map_mutex_);
+    auto &default_logger_ = get_default_logger_();
     auto is_default_logger = default_logger_ && default_logger_->name() == logger_name;
     loggers_.erase(logger_name);
     if (is_default_logger)
@@ -231,7 +245,7 @@ SPDLOG_INLINE void registry::drop_all()
 {
     std::lock_guard<std::mutex> lock(logger_map_mutex_);
     loggers_.clear();
-    default_logger_.reset();
+    get_default_logger_().reset();
 }
 
 // clean all resources and threads started by the registry
@@ -310,6 +324,17 @@ SPDLOG_INLINE void registry::register_logger_(std::shared_ptr<logger> new_logger
     throw_if_exists_(logger_name);
     loggers_[logger_name] = std::move(new_logger);
 }
+
+SPDLOG_INLINE std::shared_ptr<logger> &registry::get_default_logger_()
+{
+#ifdef SPDLOG_PER_THREAD_DEFAULT_LOGGER
+    thread_local std::shared_ptr<logger> default_logger_;
+    return default_logger_;
+#else
+    return default_logger_storage_;
+#endif
+}
+
 
 } // namespace details
 } // namespace spdlog

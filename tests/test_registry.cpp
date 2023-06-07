@@ -1,7 +1,21 @@
 #include "includes.h"
 
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+
 static const char *const tested_logger_name = "null_logger";
 static const char *const tested_logger_name2 = "null_logger2";
+
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+bool flag1 = false;
+std::condition_variable flag1_cv;
+std::mutex flag1_m;
+bool flag2 = false;
+std::condition_variable flag2_cv;
+std::mutex flag2_m;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 #ifndef SPDLOG_NO_EXCEPTIONS
 TEST_CASE("register_drop", "[registry]")
@@ -113,4 +127,86 @@ TEST_CASE("disable automatic registration", "[registry]")
     REQUIRE(logger2->level() == log_level);
     spdlog::set_level(spdlog::level::info);
     spdlog::set_automatic_registration(true);
+}
+
+TEST_CASE("per-thread default logger", "[registry]")
+{
+    spdlog::drop_all();
+    auto logger = std::make_shared<spdlog::logger>(tested_logger_name, std::make_shared<spdlog::sinks::null_sink_st>());
+    auto logger2 = std::make_shared<spdlog::logger>(tested_logger_name2, std::make_shared<spdlog::sinks::null_sink_st>());
+
+    std::thread thread1([=] {
+        spdlog::set_default_logger(logger);
+
+        // notify main thread that default logger has been changed
+        {
+            std::lock_guard<std::mutex> lock(flag1_m);
+            flag1 = true;
+        }
+        flag1_cv.notify_one();
+
+        // wait for signal from main thread before terminating
+        std::unique_lock<std::mutex> lock(flag1_m);
+        flag1_cv.wait(lock, [&]{ return !flag1; });
+    });
+
+    std::thread thread2([=] {
+        spdlog::set_default_logger(logger2);
+
+        // notify main thread that default logger has been changed
+        {
+            std::lock_guard<std::mutex> lock(flag2_m);
+            flag2 = true;
+        }
+        flag2_cv.notify_one();
+
+        // wait for signal from main thread before terminating
+        std::unique_lock<std::mutex> lock(flag2_m);
+        flag2_cv.wait(lock, [&]{ return !flag2; });
+    });
+
+    // wait for thread1 to signal that the default logger has been changed
+    {
+        std::unique_lock<std::mutex> lock1(flag1_m);
+        flag1_cv.wait(lock1, [&]{ return flag1; });
+    }
+
+#ifdef SPDLOG_PER_THREAD_DEFAULT_LOGGER
+    REQUIRE(spdlog::default_logger() == nullptr);
+#else
+    REQUIRE((spdlog::default_logger()->name() == tested_logger_name || spdlog::default_logger()->name() == tested_logger_name2));
+#endif
+
+    // wait for thread2 to signal that the default logger has been changed
+    {
+        std::unique_lock<std::mutex> lock2(flag2_m);
+        flag2_cv.wait(lock2, [&]{ return flag2; });
+    }
+
+#ifdef SPDLOG_PER_THREAD_DEFAULT_LOGGER
+    REQUIRE(spdlog::default_logger() == nullptr);
+#else
+    REQUIRE((spdlog::default_logger()->name() == tested_logger_name || spdlog::default_logger()->name() == tested_logger_name2));
+#endif
+
+    // signal thread1 & thread2 that they may terminate
+    {
+        std::lock_guard<std::mutex> lock(flag1_m);
+        flag1 = false;
+    }
+    flag1_cv.notify_one();
+    {
+        std::lock_guard<std::mutex> lock(flag2_m);
+        flag2 = false;
+    }
+    flag2_cv.notify_one();
+
+    thread1.join();
+    thread2.join();
+
+#ifdef SPDLOG_PER_THREAD_DEFAULT_LOGGER
+    REQUIRE(spdlog::default_logger() == nullptr);
+#else
+    REQUIRE((spdlog::default_logger()->name() == tested_logger_name || spdlog::default_logger()->name() == tested_logger_name2));
+#endif
 }

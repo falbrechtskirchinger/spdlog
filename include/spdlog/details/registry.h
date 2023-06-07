@@ -100,6 +100,7 @@ private:
     void throw_if_exists_(const std::string &logger_name);
     void register_logger_(std::shared_ptr<logger> new_logger);
     bool set_level_from_cfg_(logger *logger);
+    std::shared_ptr<logger> &get_default_logger_();
     std::mutex logger_map_mutex_, flusher_mutex_;
     std::recursive_mutex tp_mutex_;
     std::unordered_map<std::string, std::shared_ptr<logger>> loggers_;
@@ -110,7 +111,9 @@ private:
     err_handler err_handler_;
     std::shared_ptr<thread_pool> tp_;
     std::unique_ptr<periodic_worker> periodic_flusher_;
-    std::shared_ptr<logger> default_logger_;
+#ifndef SPDLOG_PER_THREAD_DEFAULT_LOGGER
+    std::shared_ptr<logger> default_logger_storage_;
+#endif
     bool automatic_registration_ = true;
     size_t backtrace_n_messages_ = 0;
 };
